@@ -1,27 +1,24 @@
 class UserModel {
-  int? id;
-  String? name;
-  String? email;
-  String? password;
+  final String name;
+  final String email;
+  final List<int> password;
 
-  UserModel({this.id, this.name, this.email, this.password});
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'name': name,
-      'email': email,
-      'password': password,
-    };
-  }
+  UserModel({
+    required this.name,
+    required this.email,
+    required this.password,
+  });
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
+    final passwordString = map['password'] as String;
+    final passwordParts = passwordString.split(':');
+    final hashedPassword = passwordParts[0];
+    final salt = passwordParts[1];
+
     return UserModel(
-      id: map['id'],
-      name: map['name'],
-      email: map['email'],
-      password: map['password'],
+      name: map['name'] as String,
+      email: map['email'] as String,
+      password: [hashedPassword, salt].map((e) => int.parse(e)).toList(),
     );
   }
 }
-

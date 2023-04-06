@@ -1,5 +1,10 @@
+import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:postgres/postgres.dart';
 import '../models/model_user.dart';
+
+final appDatabase = AppDatabase();
 
 class AppDatabase {
   PostgreSQLConnection? connection;
@@ -22,7 +27,7 @@ class AppDatabase {
           id SERIAL PRIMARY KEY,
           name VARCHAR(50) NOT NULL,
           email VARCHAR(50) NOT NULL,
-          password VARCHAR(100) NOT NULL
+          password TEXT NOT NULL
         );
       ''');
     } catch (e) {
@@ -33,23 +38,63 @@ class AppDatabase {
   }
 
   Future<void> addUserToDatabase(UserModel userModel) async {
-    final appDatabase = AppDatabase();
     try {
-      await appDatabase.connection!.open();
-      await appDatabase.connection!.query(
+      await connection!.open();
+      final salt = generateSalt();
+      final hashedPassword = hashPassword(userModel.password.join(''), salt);
+      await connection!.query(
         "INSERT INTO users (name, email, password) VALUES (@name, @email, @password)",
         substitutionValues: {
           'name': userModel.name,
           'email': userModel.email,
-          'password': userModel.password,
+          'password': '$hashedPassword:$salt',
         },
       );
       print('User added to database');
     } catch (e) {
       print('Error adding user to database: $e');
     } finally {
-      await appDatabase.connection!.close();
+      await connection!.close();
     }
+  }
+
+
+  Future<UserModel?> getUserByEmailAndPassword(String email, String password) async {
+    try {
+      await appDatabase.connection!.open();
+      final result = await appDatabase.connection!.query(
+        'SELECT * FROM users WHERE email = @email LIMIT 1',
+        substitutionValues: {'email': email},
+      );
+      if (result.isNotEmpty) {
+        final userData = result.first.asMap();
+        final salt = userData['password']
+            .split(':')
+            .last;
+        final hashedPassword = hashPassword(password, salt);
+        if (userData['password']
+            .split(':')
+            .first == hashedPassword) {
+          return UserModel.fromMap(userData.cast<String, dynamic>());
+        }
+      }
+    } finally {
+      await appDatabase.connection?.close();
+    }
+    return null;
+  }
+
+  String generateSalt() {
+    final random = Random.secure();
+    final List<int> bytes = List.generate(16, (_) => random.nextInt(256));
+    return base64Url.encode(bytes);
+  }
+
+  String hashPassword(String password, String salt) {
+    final codec = utf8.fuse(base64Url);
+    final bytes = codec.encode('$password$salt');
+    final hash = sha256.convert(bytes as List<int>);
+    return codec.encode(hash.bytes as String);
   }
 }
 
