@@ -75,8 +75,9 @@ class _LoginPageState extends State<_LoginPage> {
                   try {
                     await appDatabase.connection!.open();
                     final email = _emailController.text;
-                    final user =
-                    await appDatabase.getUserByEmailAndPassword(email, _passwordController.text);
+                    // Создаем новый экземпляр базы данных, чтобы избежать ошибки
+                    final appDatabaseForLogin = AppDatabase();
+                    final user = await appDatabaseForLogin.getUserByEmailAndPassword(email, _passwordController.text);
                     if (user == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -94,7 +95,7 @@ class _LoginPageState extends State<_LoginPage> {
                 }
               },
               child: const Text('Log in'),
-            ),
+                ),
             const SizedBox(height: 16.0),
             Center(
               child: TextButton(
